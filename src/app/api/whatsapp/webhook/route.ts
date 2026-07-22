@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getWhatsAppEnvValidation } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { detectOptOut, normalizeMessageBody, normalizeWebhookPayload, normalizeWhatsAppId, verifyWebhookSignature } from "@/lib/whatsapp/service";
 
@@ -33,6 +34,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const whatsappValidation = getWhatsAppEnvValidation();
+  if (!whatsappValidation.ok) {
+    return NextResponse.json({ error: "WhatsApp credentials are not configured" }, { status: 500 });
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
   const bypass = process.env.NODE_ENV !== "production" && process.env.WHATSAPP_SIGNATURE_BYPASS === "true";

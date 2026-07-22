@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { getServerEnv } from "@/lib/env";
+import { getCoreEnv } from "@/lib/env";
 
 export function getSupabaseAdmin() {
-  const env = getServerEnv();
+  const env = getCoreEnv();
   return createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY,

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import { z } from "zod";
 
-import { getServerEnv } from "@/lib/env";
+import { getWhatsAppEnv, getWhatsAppEnvValidation } from "@/lib/env";
 
 export type WhatsAppDirection = "inbound" | "outbound";
 export type WhatsAppMessageType = "text" | "button" | "list_reply" | "image" | "video" | "document" | "audio" | "voice" | "location" | "contacts" | "reaction" | "unsupported";
@@ -44,7 +44,12 @@ const webhookEventSchema = z.object({
 });
 
 export function verifyWebhookSignature(rawBody: string, signature: string | null | undefined) {
-  const env = getServerEnv();
+  const validation = getWhatsAppEnvValidation();
+  if (!validation.ok) {
+    return false;
+  }
+
+  const env = getWhatsAppEnv();
   const expected = `sha256=${crypto.createHmac("sha256", env.WHATSAPP_APP_SECRET).update(rawBody).digest("hex")}`;
   if (!signature) {
     return false;
@@ -61,7 +66,12 @@ export function normalizeWebhookPayload(payload: unknown) {
 }
 
 export async function sendTemplateMessage(request: TemplateMessageRequest): Promise<SendTemplateMessageResult> {
-  const env = getServerEnv();
+  const validation = getWhatsAppEnvValidation();
+  if (!validation.ok) {
+    return { ok: false, status: 500, error: "WhatsApp credentials are not configured" };
+  }
+
+  const env = getWhatsAppEnv();
   const response = await fetch(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
     method: "POST",
     headers: {

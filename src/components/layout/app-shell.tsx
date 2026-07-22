@@ -49,7 +49,12 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
             <h1>{title}</h1>
             {subtitle ? <p className="muted">{subtitle}</p> : null}
           </div>
-          <div className="page-header__chip">Stage 1 foundation</div>
+          <div className="page-header__actions">
+            <div className="page-header__chip">Stage 1 foundation</div>
+            <form action="/auth/sign-out" method="post">
+              <button type="submit">Log out</button>
+            </form>
+          </div>
         </header>
 
         <div className="content-stack">{children}</div>

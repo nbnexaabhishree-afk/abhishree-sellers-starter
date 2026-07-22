@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getServerEnv } from "@/lib/env";
+import { getCoreEnv, getCoreEnvValidation } from "@/lib/env";
 import { createClient } from "@supabase/supabase-js";
 
 export type ContactStatus = "new" | "follow_up" | "qualified" | "won" | "lost" | "do_not_contact";
@@ -137,22 +137,16 @@ export function buildImportSummary(overrides: Partial<ImportSummary> = {}): Impo
 }
 
 export function getEnvValidation(env: Record<string, string | undefined> = process.env) {
-  const required = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const;
-  const missing = required.filter((name) => !env[name]);
-
-  return {
-    ok: missing.length === 0,
-    missing
-  };
+  return getCoreEnvValidation(env);
 }
 
 export function createSupabaseClient() {
-  const env = getServerEnv();
+  const env = getCoreEnv();
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
 export const createSupabaseServiceRoleClient = () => {
-  const env = getServerEnv();
+  const env = getCoreEnv();
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   });

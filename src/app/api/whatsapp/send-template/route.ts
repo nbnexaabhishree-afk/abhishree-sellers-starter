@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { getWhatsAppEnv, getWhatsAppEnvValidation } from "@/lib/env";
+
 const bodySchema = z.object({
   to: z.string().min(10),
   templateName: z.string().min(1),
@@ -10,23 +12,22 @@ const bodySchema = z.object({
 export async function POST(request: NextRequest) {
   const body = bodySchema.parse(await request.json());
 
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const apiVersion = process.env.WHATSAPP_API_VERSION ?? "v23.0";
-
-  if (!accessToken || !phoneNumberId) {
+  const whatsappValidation = getWhatsAppEnvValidation();
+  if (!whatsappValidation.ok) {
     return NextResponse.json(
       { error: "WhatsApp credentials are not configured" },
       { status: 500 }
     );
   }
 
+  const env = getWhatsAppEnv();
+
   const response = await fetch(
-    `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
+    `https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({

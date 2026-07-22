@@ -1,6 +1,8 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { requireUser } from "@/lib/auth/require-user";
 
-export default function WhatsAppTestPage() {
+export default async function WhatsAppTestPage() {
+  await requireUser();
   return (
     <AppShell title="WhatsApp test" subtitle="Send a single safe test message to one recipient.">
       <section className="card">

@@ -2,10 +2,10 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { EmptyState } from "@/components/ui/empty-state";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth/require-user";
 
 export default async function ContactsPage() {
-  const supabase = await createSupabaseServerClient();
+  const { supabase } = await requireUser();
   const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false });
 
   return (

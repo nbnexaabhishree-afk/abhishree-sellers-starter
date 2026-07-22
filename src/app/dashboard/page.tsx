@@ -1,9 +1,9 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { EmptyState } from "@/components/ui/empty-state";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth/require-user";
 
 export default async function DashboardPage() {
-  const supabase = await createSupabaseServerClient();
+  const { supabase } = await requireUser();
   const { data, error } = await supabase.from("contacts").select("*").limit(5);
 
   return (

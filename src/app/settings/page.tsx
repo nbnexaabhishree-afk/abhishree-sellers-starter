@@ -1,7 +1,9 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { requireUser } from "@/lib/auth/require-user";
 import { redactSecret } from "@/lib/whatsapp/service";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  await requireUser();
   const lastWebhook = null;
   return (
     <AppShell title="Settings" subtitle="Safe WhatsApp configuration and event monitoring.">
@@ -14,7 +16,7 @@ export default function SettingsPage() {
           <li><strong>Webhook verify token configured:</strong> {process.env.WHATSAPP_VERIFY_TOKEN ? "yes" : "no"}</li>
           <li><strong>App secret configured:</strong> {process.env.WHATSAPP_APP_SECRET ? "yes" : "no"}</li>
           <li><strong>Access token configured:</strong> {process.env.WHATSAPP_ACCESS_TOKEN ? "yes" : "no"}</li>
-          <li><strong>Webhook URL:</strong> {process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000/api/whatsapp/webhook"}</li>
+          <li><strong>Webhook URL:</strong> {process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001/api/whatsapp/webhook"}</li>
           <li><strong>Last webhook received:</strong> {lastWebhook ?? "none"}</li>
           <li><strong>Access token preview:</strong> {redactSecret(process.env.WHATSAPP_ACCESS_TOKEN)}</li>
           <li><strong>App secret preview:</strong> {redactSecret(process.env.WHATSAPP_APP_SECRET)}</li>

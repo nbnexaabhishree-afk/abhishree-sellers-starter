@@ -30,7 +30,7 @@ WHATSAPP_BUSINESS_ACCOUNT_ID=
 WHATSAPP_APP_SECRET=
 WHATSAPP_API_VERSION=v23.0
 WHATSAPP_SIGNATURE_BYPASS=false
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:3001
 ```
 
 ## Meta WhatsApp Cloud API setup
@@ -50,10 +50,10 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 cd "D:\AI\Projects\Abhishree Sellers\abhishree-sellers-starter"
 npm install
 copy .env.example .env.local
-npm run dev
+npm run dev -- -p 3001
 ```
 
-Open http://localhost:3000 and sign in at /login.
+Open http://localhost:3001 and sign in at /login.
 
 ## Verification checklist
 

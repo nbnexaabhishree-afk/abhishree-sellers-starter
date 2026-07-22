@@ -1,26 +1,26 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function LoginPage() {
+const errorMessages: Record<string, string> = {
+  invalid: "The email or password is incorrect.",
+  missing: "Enter both your email and password."
+};
+
+type LoginPageProps = {
+  searchParams: Promise<{ error?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (user) {
-    return (
-      <main className="auth-page">
-        <div className="auth-card">
-          <h1>Already signed in</h1>
-          <p>You are already authenticated. Continue to the dashboard.</p>
-          <Link href="/dashboard" className="button-link">
-            Open dashboard
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  if (user) redirect("/dashboard");
+
+  const { error } = await searchParams;
+  const errorMessage = error ? errorMessages[error] : null;
 
   return (
     <main className="auth-page">
@@ -28,6 +28,11 @@ export default async function LoginPage() {
         <p className="eyebrow">Admin access</p>
         <h1>Sign in to Abhishree Sellers</h1>
         <p className="muted">Use your Supabase-authenticated admin account to continue.</p>
+        {errorMessage ? (
+          <p className="error-message" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
         <form action="/auth/sign-in" method="post" className="auth-form">
           <label>
             Email

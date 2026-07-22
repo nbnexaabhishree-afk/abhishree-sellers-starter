@@ -78,29 +78,41 @@ alter table whatsapp_webhook_events enable row level security;
 alter table messages enable row level security;
 alter table whatsapp_contacts enable row level security;
 
-create policy if not exists whatsapp_webhook_events_select_policy on whatsapp_webhook_events
+drop policy if exists whatsapp_webhook_events_select_policy on whatsapp_webhook_events;
+create policy whatsapp_webhook_events_select_policy on whatsapp_webhook_events
 for select to authenticated using (true);
-create policy if not exists whatsapp_webhook_events_insert_policy on whatsapp_webhook_events
+drop policy if exists whatsapp_webhook_events_insert_policy on whatsapp_webhook_events;
+create policy whatsapp_webhook_events_insert_policy on whatsapp_webhook_events
 for insert to authenticated with check (true);
-create policy if not exists whatsapp_webhook_events_update_policy on whatsapp_webhook_events
+drop policy if exists whatsapp_webhook_events_update_policy on whatsapp_webhook_events;
+create policy whatsapp_webhook_events_update_policy on whatsapp_webhook_events
 for update to authenticated using (true) with check (true);
-create policy if not exists whatsapp_webhook_events_no_anonymous_policy on whatsapp_webhook_events
+drop policy if exists whatsapp_webhook_events_no_anonymous_policy on whatsapp_webhook_events;
+create policy whatsapp_webhook_events_no_anonymous_policy on whatsapp_webhook_events
 for all to anon using (false) with check (false);
 
-create policy if not exists messages_select_policy on messages
+drop policy if exists messages_select_policy on messages;
+create policy messages_select_policy on messages
 for select to authenticated using (true);
-create policy if not exists messages_insert_policy on messages
+drop policy if exists messages_insert_policy on messages;
+create policy messages_insert_policy on messages
 for insert to authenticated with check (true);
-create policy if not exists messages_update_policy on messages
+drop policy if exists messages_update_policy on messages;
+create policy messages_update_policy on messages
 for update to authenticated using (true) with check (true);
-create policy if not exists messages_no_anonymous_policy on messages
+drop policy if exists messages_no_anonymous_policy on messages;
+create policy messages_no_anonymous_policy on messages
 for all to anon using (false) with check (false);
 
-create policy if not exists whatsapp_contacts_select_policy on whatsapp_contacts
+drop policy if exists whatsapp_contacts_select_policy on whatsapp_contacts;
+create policy whatsapp_contacts_select_policy on whatsapp_contacts
 for select to authenticated using (true);
-create policy if not exists whatsapp_contacts_insert_policy on whatsapp_contacts
+drop policy if exists whatsapp_contacts_insert_policy on whatsapp_contacts;
+create policy whatsapp_contacts_insert_policy on whatsapp_contacts
 for insert to authenticated with check (true);
-create policy if not exists whatsapp_contacts_update_policy on whatsapp_contacts
+drop policy if exists whatsapp_contacts_update_policy on whatsapp_contacts;
+create policy whatsapp_contacts_update_policy on whatsapp_contacts
 for update to authenticated using (true) with check (true);
-create policy if not exists whatsapp_contacts_no_anonymous_policy on whatsapp_contacts
+drop policy if exists whatsapp_contacts_no_anonymous_policy on whatsapp_contacts;
+create policy whatsapp_contacts_no_anonymous_policy on whatsapp_contacts
 for all to anon using (false) with check (false);

@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
 
-import { z } from "zod";
-
 import { getWhatsAppEnv, getWhatsAppEnvValidation } from "@/lib/env";
 
 export type WhatsAppDirection = "inbound" | "outbound";
@@ -28,20 +26,19 @@ export type SendTemplateMessageResult = {
   error?: string;
 };
 
-const webhookEventSchema = z.object({
-  object: z.string().optional(),
-  entry: z.array(
-    z.object({
-      id: z.string().optional(),
-      changes: z.array(
-        z.object({
-          value: z.unknown(),
-          field: z.string().optional()
-        })
-      )
-    })
-  )
-});
+type WebhookValue = Record<string, unknown>;
+
+export type NormalizedWebhookPayload = {
+  object?: string;
+  entry: Array<{
+    id?: string;
+    changes: Array<{ field?: string; value: WebhookValue }>;
+  }>;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export function verifyWebhookSignature(rawBody: string, signature: string | null | undefined) {
   const validation = getWhatsAppEnvValidation();
@@ -57,12 +54,63 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
 
-export function normalizeWebhookPayload(payload: unknown) {
-  const parsed = webhookEventSchema.safeParse(payload);
-  if (!parsed.success) {
-    return null;
+export function normalizeWebhookPayload(payload: unknown): NormalizedWebhookPayload | null {
+  if (!isRecord(payload)) return null;
+
+  if (Array.isArray(payload.entry)) {
+    const entries = payload.entry.flatMap((entry) => {
+      if (!isRecord(entry) || !Array.isArray(entry.changes)) return [];
+      const changes = entry.changes.flatMap((change) => {
+        if (!isRecord(change) || !isRecord(change.value)) return [];
+        return [{
+          field: typeof change.field === "string" ? change.field : undefined,
+          value: change.value
+        }];
+      });
+      return changes.length > 0 ? [{
+        id: typeof entry.id === "string" ? entry.id : undefined,
+        changes
+      }] : [];
+    });
+
+    if (entries.length > 0) {
+      return {
+        object: typeof payload.object === "string" ? payload.object : undefined,
+        entry: entries
+      };
+    }
   }
-  return parsed.data;
+
+  if (payload.field === "messages" && isRecord(payload.value)) {
+    return { entry: [{ changes: [{ field: "messages", value: payload.value }] }] };
+  }
+
+  if (Array.isArray(payload.messages) || Array.isArray(payload.statuses)) {
+    return { entry: [{ changes: [{ field: "messages", value: payload }] }] };
+  }
+
+  return null;
+}
+
+export function extractWebhookMessages(payload: NormalizedWebhookPayload) {
+  return payload.entry.flatMap((entry) => entry.changes.flatMap((change) => {
+    const messages = Array.isArray(change.value.messages) ? change.value.messages : [];
+    const contacts = Array.isArray(change.value.contacts) ? change.value.contacts : [];
+
+    return messages.flatMap((message) => {
+      if (!isRecord(message)) return [];
+      const sender = typeof message.from === "string" ? message.from : null;
+      const matchingContact = contacts.find((contact) => isRecord(contact) && contact.wa_id === sender);
+      const profile = isRecord(matchingContact) && isRecord(matchingContact.profile)
+        ? matchingContact.profile
+        : null;
+
+      return [{
+        message,
+        profileName: profile && typeof profile.name === "string" ? profile.name : null
+      }];
+    });
+  }));
 }
 
 export async function sendTemplateMessage(request: TemplateMessageRequest): Promise<SendTemplateMessageResult> {
@@ -119,6 +167,19 @@ export function normalizeMessageBody(message: Record<string, unknown>) {
   }
   if (type === "list_reply") {
     return typeof payload.list_reply?.title === "string" ? payload.list_reply.title : null;
+  }
+  if (type === "interactive") {
+    const interactive = payload.interactive;
+    if (interactive?.type === "list_reply" && typeof interactive.list_reply === "object" && interactive.list_reply !== null) {
+      return typeof (interactive.list_reply as Record<string, unknown>).title === "string"
+        ? (interactive.list_reply as Record<string, unknown>).title as string
+        : null;
+    }
+    if (interactive?.type === "button_reply" && typeof interactive.button_reply === "object" && interactive.button_reply !== null) {
+      return typeof (interactive.button_reply as Record<string, unknown>).title === "string"
+        ? (interactive.button_reply as Record<string, unknown>).title as string
+        : null;
+    }
   }
   if (type === "reaction") {
     return typeof payload.reaction?.emoji === "string" ? payload.reaction.emoji : null;

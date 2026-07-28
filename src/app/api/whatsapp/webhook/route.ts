@@ -67,8 +67,10 @@ export async function GET(request: NextRequest) {
   const mode = request.nextUrl.searchParams.get("hub.mode");
   const token = request.nextUrl.searchParams.get("hub.verify_token");
   const challenge = request.nextUrl.searchParams.get("hub.challenge");
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
+  const providedToken = token?.trim();
 
-  if (mode === "subscribe" && token && token === process.env.WHATSAPP_VERIFY_TOKEN && challenge) {
+  if (mode === "subscribe" && providedToken && providedToken === expectedToken && challenge) {
     return new NextResponse(challenge, { status: 200, headers: { "content-type": "text/plain" } });
   }
 

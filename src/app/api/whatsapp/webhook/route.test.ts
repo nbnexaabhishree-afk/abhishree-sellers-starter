@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 vi.mock("@/lib/env", () => ({
   getWhatsAppEnvValidation: () => ({ ok: true, missing: [] })
@@ -117,6 +117,34 @@ function webhookRequest(payload: unknown) {
     body: JSON.stringify(payload)
   });
 }
+
+function verificationRequest(searchParams: string) {
+  return new NextRequest(`http://localhost:3001/api/whatsapp/webhook?${searchParams}`);
+}
+
+describe("WhatsApp webhook verification", () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns the challenge when the verify token matches", async () => {
+    vi.stubEnv("WHATSAPP_VERIFY_TOKEN", "  sample-token  ");
+
+    const response = await GET(verificationRequest("hub.mode=subscribe&hub.verify_token=sample-token&hub.challenge=test-challenge"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(await response.text()).toBe("test-challenge");
+  });
+
+  it("returns 403 when the verify token does not match", async () => {
+    vi.stubEnv("WHATSAPP_VERIFY_TOKEN", "sample-token");
+
+    const response = await GET(verificationRequest("hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=test-challenge"));
+
+    expect(response.status).toBe(403);
+  });
+});
 
 describe("WhatsApp webhook persistence", () => {
   beforeEach(() => {

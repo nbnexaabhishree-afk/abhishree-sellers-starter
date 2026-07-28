@@ -12,7 +12,13 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json());
+  let parsed;
+  try {
+    parsed = bodySchema.safeParse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+  }
+
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -44,6 +50,10 @@ export async function POST(request: Request) {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   });
+
+  if (!result.ok) {
+    return NextResponse.json(result, { status: result.status >= 400 ? result.status : 500 });
+  }
 
   return NextResponse.json(result);
 }

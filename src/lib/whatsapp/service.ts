@@ -120,36 +120,58 @@ export async function sendTemplateMessage(request: TemplateMessageRequest): Prom
   }
 
   const env = getWhatsAppEnv();
-  const response = await fetch(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: request.to,
-      type: "template",
-      template: {
-        name: request.template.name,
-        language: { code: request.template.languageCode },
-        components: [
-          ...(request.template.bodyParameters ? [{ type: "body", parameters: request.template.bodyParameters.map((value) => ({ type: "text", text: value })) }] : []),
-          ...(request.template.headerParameters ? [{ type: "header", parameters: request.template.headerParameters.map((value) => ({ type: "text", text: value })) }] : []),
-          ...(request.template.buttonParameters ? [{ type: "button", parameters: request.template.buttonParameters.map((value) => ({ type: "text", text: value })) }] : [])
-        ]
-      }
-    }),
-    signal: AbortSignal.timeout(15000)
-  });
+  try {
+    const response = await fetch(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: request.to,
+        type: "template",
+        template: {
+          name: request.template.name,
+          language: { code: request.template.languageCode }
+        }
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
 
-  const responseBody = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    return { ok: false, status: response.status, error: responseBody?.error?.message ?? "Template send failed" };
+    const responseText = await response.text();
+    let responseBody: Record<string, unknown> = {};
+    try {
+      responseBody = responseText ? JSON.parse(responseText) as Record<string, unknown> : {};
+    } catch {
+      responseBody = { raw: responseText };
+    }
+
+    if (!response.ok) {
+      console.error("WhatsApp Meta API error", {
+        status: response.status,
+        body: responseBody,
+        phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
+      });
+      return {
+        ok: false,
+        status: response.status,
+        error: (responseBody?.error as { message?: string } | undefined)?.message ?? "Template send failed"
+      };
+    }
+
+    const messageId = typeof (responseBody?.messages as Array<{ id?: string }> | undefined)?.[0]?.id === "string"
+      ? (responseBody.messages as Array<{ id?: string }>)[0].id
+      : undefined;
+    return { ok: true, status: response.status, messageId };
+  } catch (error) {
+    console.error("WhatsApp send failed", error);
+    return {
+      ok: false,
+      status: 500,
+      error: error instanceof Error ? error.message : "Template send failed"
+    };
   }
-
-  const messageId = responseBody?.messages?.[0]?.id;
-  return { ok: true, status: response.status, messageId };
 }
 
 export function normalizeWhatsAppId(value: string) {

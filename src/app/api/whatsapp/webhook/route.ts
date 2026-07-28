@@ -23,6 +23,42 @@ function createEventKey(rawBody: string) {
   return `wa:${createHash("sha256").update(rawBody).digest("hex")}`;
 }
 
+async function sendWhatsAppMessage(to: string, text: string) {
+  if (process.env.NODE_ENV === "test") {
+    return { ok: true, skipped: true };
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v25.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: {
+          body: text
+        }
+      })
+    }
+  );
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    console.error("WhatsApp send failed", responseText);
+  }
+
+  try {
+    return responseText ? JSON.parse(responseText) : { ok: response.ok };
+  } catch {
+    return { ok: response.ok, raw: responseText };
+  }
+}
+
 async function updateEventStatus(
   supabase: AdminClient,
   eventKey: string,
@@ -211,6 +247,11 @@ export async function POST(request: NextRequest) {
 
     const body = normalizeMessageBody(message);
     const optedOut = detectOptOut(body);
+
+    await sendWhatsAppMessage(
+      waId,
+      "Hello 👋 Welcome to Abhishree Homes. Are you looking to buy, sell, or rent a property?"
+    );
     if (contactRecord?.id) {
       const contactUpdateResult = await runSupabaseOperation(
         "update_contact_from_inbound_message",

@@ -28,6 +28,8 @@ async function sendWhatsAppMessage(to: string, text: string) {
     return { ok: true, skipped: true };
   }
 
+  console.log("Sending WhatsApp reply", { to, text });
+
   const response = await fetch(
     `https://graph.facebook.com/v25.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {
@@ -48,6 +50,7 @@ async function sendWhatsAppMessage(to: string, text: string) {
   );
 
   const responseText = await response.text();
+  console.log("WhatsApp API response", response.status, responseText);
   if (!response.ok) {
     console.error("WhatsApp send failed", responseText);
   }

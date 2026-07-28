@@ -251,6 +251,12 @@ export async function POST(request: NextRequest) {
     const body = normalizeMessageBody(message);
     const optedOut = detectOptOut(body);
 
+    console.log("Reply trigger check", {
+      waId,
+      tokenExists: !!process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID
+    });
+
     await sendWhatsAppMessage(
       waId,
       "Hello 👋 Welcome to Abhishree Homes. Are you looking to buy, sell, or rent a property?"

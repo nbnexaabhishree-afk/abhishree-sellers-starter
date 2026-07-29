@@ -13,6 +13,7 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    console.log("TEST SEND ROUTE HIT");
     console.log("WhatsApp test send starting");
     console.log("WhatsApp test send env", {
       tokenExists: !!process.env.WHATSAPP_ACCESS_TOKEN,

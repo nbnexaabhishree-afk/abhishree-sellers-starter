@@ -8,6 +8,8 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const requestedNext = String(formData.get("next") ?? "/dashboard");
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/dashboard";
 
   if (!email || !password) {
     return NextResponse.redirect(getRedirectUrl("/login?error=missing", request.url));
@@ -21,5 +23,5 @@ export async function POST(request: Request) {
     return NextResponse.redirect(getRedirectUrl("/login?error=invalid", request.url));
   }
 
-  return NextResponse.redirect(getRedirectUrl("/dashboard", request.url));
+  return NextResponse.redirect(getRedirectUrl(next, request.url));
 }

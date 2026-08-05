@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -8,7 +9,7 @@ const errorMessages: Record<string, string> = {
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; notice?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -17,23 +18,26 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/dashboard");
+  const { error, next, notice } = await searchParams;
+  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  if (user) redirect(safeNext);
 
-  const { error } = await searchParams;
   const errorMessage = error ? errorMessages[error] : null;
 
   return (
     <main className="auth-page">
       <div className="auth-card">
         <p className="eyebrow">Admin access</p>
-        <h1>Sign in to Abhishree Sellers</h1>
-        <p className="muted">Use your Supabase-authenticated admin account to continue.</p>
+        <h1>Sign in to PropertyFlow</h1>
+        <p className="muted">Access your isolated property seller workspaces.</p>
         {errorMessage ? (
           <p className="error-message" role="alert">
             {errorMessage}
           </p>
         ) : null}
+        {notice === "check-email" ? <p className="notice">Check your email to confirm the account, then sign in.</p> : null}
         <form action="/auth/sign-in" method="post" className="auth-form">
+          <input type="hidden" name="next" value={safeNext} />
           <label>
             Email
             <input name="email" type="email" placeholder="admin@example.com" required />
@@ -44,6 +48,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </label>
           <button type="submit">Sign in</button>
         </form>
+        <p className="muted">New to PropertyFlow? <Link href="/register">Create an account</Link></p>
       </div>
     </main>
   );

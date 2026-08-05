@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { getCoreEnvValidation, getWhatsAppEnvValidation } from "@/lib/env";
+import { getCoreEnvValidation, getStripeEnvValidation, getWhatsAppEnvValidation } from "@/lib/env";
 
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    service: "abhishree-sellers",
+    service: "propertyflow",
     timestamp: new Date().toISOString(),
     environment: {
       core: getCoreEnvValidation(),
-      whatsapp: getWhatsAppEnvValidation()
+      whatsapp: getWhatsAppEnvValidation(),
+      stripe: getStripeEnvValidation()
     }
   });
 }

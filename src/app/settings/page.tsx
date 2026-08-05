@@ -26,7 +26,7 @@ export default async function SettingsPage() {
     ? "stored securely"
     : null;
   return (
-    <AppShell title="Settings" subtitle="Safe WhatsApp configuration and event monitoring.">
+    <AppShell workspace={workspace} title="Settings" subtitle="Safe WhatsApp configuration and event monitoring.">
       <section className="card">
         <h3>WhatsApp setup status</h3>
         <ul className="stack-list">

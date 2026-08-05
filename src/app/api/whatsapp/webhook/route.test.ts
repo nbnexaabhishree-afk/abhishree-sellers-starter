@@ -75,6 +75,15 @@ function createFakeDatabase(queuedResults: Record<string, FakeResult[]> = {}) {
   const calls: DatabaseCall[] = [];
 
   const client = {
+    rpc(name: string, payload: Record<string, unknown>) {
+      calls.push({ table: name, operation: "rpc", payload });
+      const result = queuedResults[`rpc.${name}`]?.shift() ?? {
+        data: { sellerLeadId: "seller-lead-1", propertyMediaId: "property-media-1" },
+        error: null,
+        status: 200
+      };
+      return Promise.resolve(result);
+    },
     from(table: string) {
       let operation = "select";
       const chain: Record<string, unknown> & PromiseLike<FakeResult> = {
@@ -381,29 +390,19 @@ describe("WhatsApp webhook persistence", () => {
 
     expect(response.status).toBe(200);
     expect(database.calls.find((call) =>
-      call.table === "conversation_state" && call.operation === "update"
-    )?.payload).toMatchObject({ current_step: "completed", status: "completed" });
-    expect(database.calls.find((call) =>
-      call.table === "seller_leads" && call.operation === "insert"
+      call.table === "complete_seller_conversation" && call.operation === "rpc"
     )?.payload).toMatchObject({
-      seller_name: "Anita Shah",
-      seller_email: "anita@example.com",
-      documents_available: true,
-      raw_collected_data: {
+      target_workspace_id: "00000000-0000-4000-8000-000000000001",
+      target_conversation_state_id: "conversation-1",
+      target_whatsapp_message_id: "wamid.media-message",
+      collected_data: {
+        seller_name: "Anita Shah",
+        seller_email: "anita@example.com",
+        documents_available: true,
         property_media: { mediaId: "media-1", mediaType: "image" }
       }
     });
-    expect(database.calls.find((call) =>
-      call.table === "property_media" && call.operation === "insert"
-    )?.payload).toMatchObject({
-      workspace_id: "00000000-0000-4000-8000-000000000001",
-      enquiry_id: null,
-      seller_lead_id: "seller_leads-1",
-      conversation_state_id: "conversation-1",
-      whatsapp_message_id: "wamid.media-message",
-      media_id: "media-1",
-      media_type: "image",
-      storage_path: null
-    });
+    expect(database.calls.some((call) => call.table === "seller_leads")).toBe(false);
+    expect(database.calls.some((call) => call.table === "property_media")).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { resolveWorkspaceWhatsAppIntegration } from "@/lib/whatsapp/integration";
 import { sendTemplateMessage } from "@/lib/whatsapp/service";
 import { requireApiWorkspace } from "@/lib/workspaces/context";
+import { reserveWhatsAppMessage } from "@/lib/billing/usage";
 
 const bodySchema = z.object({
   to: z.string().trim().min(1),
@@ -55,6 +56,11 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (contact?.do_not_contact) {
       return NextResponse.json({ ok: false, error: "Contact is opted out", details: "Recipient is currently opted out" }, { status: 403 });
+    }
+
+    const usage = await reserveWhatsAppMessage(supabase, workspaceId, request.headers.get("idempotency-key") ?? undefined);
+    if (!usage.allowed) {
+      return NextResponse.json({ ok: false, error: "Monthly WhatsApp message limit reached", usage }, { status: 429 });
     }
 
     const result = await sendTemplateMessage({

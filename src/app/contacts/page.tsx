@@ -15,7 +15,7 @@ export default async function ContactsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <AppShell title="Contacts" subtitle="Use the contacts workspace to manage property-owner records.">
+    <AppShell workspace={workspace} title="Contacts" subtitle="Use the contacts workspace to manage property-owner records.">
       <section className="card">
         <div className="row-between">
           <h3>Contact directory</h3>

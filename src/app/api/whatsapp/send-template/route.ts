@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { resolveWorkspaceWhatsAppIntegration } from "@/lib/whatsapp/integration";
 import { sendTemplateMessage } from "@/lib/whatsapp/service";
 import { requireApiWorkspace } from "@/lib/workspaces/context";
+import { reserveWhatsAppMessage } from "@/lib/billing/usage";
 
 const bodySchema = z.object({
   to: z.string().min(10),
@@ -21,15 +22,18 @@ export async function POST(request: NextRequest) {
   const workspace = await requireApiWorkspace();
   if (!workspace.ok) return workspace.response;
 
-  const integration = await resolveWorkspaceWhatsAppIntegration(
-    createSupabaseAdminClient(),
-    workspace.context.workspaceId
-  );
+  const admin = createSupabaseAdminClient();
+  const integration = await resolveWorkspaceWhatsAppIntegration(admin, workspace.context.workspaceId);
   if (!integration) {
     return NextResponse.json(
       { error: "WhatsApp integration is not configured for this workspace" },
       { status: 409 }
     );
+  }
+
+  const usage = await reserveWhatsAppMessage(admin, workspace.context.workspaceId, request.headers.get("idempotency-key") ?? undefined);
+  if (!usage.allowed) {
+    return NextResponse.json({ error: "Monthly WhatsApp message limit reached", usage }, { status: 429 });
   }
 
   const result = await sendTemplateMessage({

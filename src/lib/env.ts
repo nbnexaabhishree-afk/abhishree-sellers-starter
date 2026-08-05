@@ -42,6 +42,13 @@ const whatsappEnvSchema = z.object({
   WHATSAPP_API_VERSION: optionalStringWithDefault("v23.0")
 });
 
+const stripeEnvSchema = z.object({
+  STRIPE_SECRET_KEY: requiredString,
+  STRIPE_WEBHOOK_SECRET: requiredString,
+  STRIPE_STARTER_PRICE_ID: requiredString,
+  STRIPE_PRO_PRICE_ID: requiredString
+});
+
 export function getCoreEnv(env: Record<string, string | undefined> = process.env) {
   return coreEnvSchema.parse(env);
 }
@@ -56,6 +63,16 @@ export function getWhatsAppEnv(env: Record<string, string | undefined> = process
 
 export function getIntegrationEncryptionKey(env: Record<string, string | undefined> = process.env) {
   return requiredString.parse(env.WHATSAPP_CREDENTIALS_ENCRYPTION_KEY);
+}
+
+export function getStripeEnv(env: Record<string, string | undefined> = process.env) {
+  return stripeEnvSchema.parse(env);
+}
+
+export function getStripeEnvValidation(env: Record<string, string | undefined> = process.env) {
+  const required = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_STARTER_PRICE_ID", "STRIPE_PRO_PRICE_ID"] as const;
+  const missing = required.filter((name) => !env[name]?.trim());
+  return { ok: missing.length === 0, missing };
 }
 
 export function getClientEnv(env: Record<string, string | undefined> = process.env) {

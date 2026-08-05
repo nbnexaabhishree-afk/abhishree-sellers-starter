@@ -13,7 +13,7 @@ export default async function DashboardPage() {
     .limit(5);
 
   return (
-    <AppShell title="Dashboard" subtitle="Protected admin area for your contact operations.">
+    <AppShell workspace={workspace} title="Dashboard" subtitle="Protected admin area for your contact operations.">
       <section className="hero-card">
         <div>
           <p className="eyebrow">Secure workspace</p>

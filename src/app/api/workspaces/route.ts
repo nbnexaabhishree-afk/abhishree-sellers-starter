@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspaces/context";
 
 const workspaceSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -41,5 +43,13 @@ export async function POST(request: Request) {
   if (contentType.includes("application/json")) {
     return NextResponse.json({ id: data }, { status: 201 });
   }
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_WORKSPACE_COOKIE, String(data), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365
+  });
   return NextResponse.redirect(new URL("/dashboard", request.url), { status: 303 });
 }

@@ -7,14 +7,13 @@ import {
   runSupabaseOperation
 } from "@/lib/repositories/whatsapp-webhook-repository";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { reserveWhatsAppMessage } from "@/lib/billing/usage";
 import { ABHISHREE_WORKSPACE_ID } from "@/lib/workspaces/constants";
 import { ConversationEngine } from "@/lib/whatsapp/conversation-engine";
 import {
   isSellerConversationStart,
   snapshotFromConversationRow,
-  toConversationInput,
-  toPropertyMediaInsert,
-  toSellerLeadInsert
+  toConversationInput
 } from "@/lib/whatsapp/conversation-webhook";
 import {
   detectOptOut,
@@ -33,10 +32,20 @@ function createEventKey(rawBody: string) {
   return `wa:${createHash("sha256").update(rawBody).digest("hex")}`;
 }
 
-async function sendWhatsAppMessage(to: string, text: string, credentials: WhatsAppCredentials) {
+async function sendWhatsAppMessage(
+  to: string,
+  text: string,
+  credentials: WhatsAppCredentials,
+  supabase: AdminClient,
+  workspaceId: string,
+  usageKey: string
+) {
   if (process.env.NODE_ENV === "test") {
     return { ok: true, skipped: true };
   }
+
+  const usage = await reserveWhatsAppMessage(supabase, workspaceId, usageKey);
+  if (!usage.allowed) return { ok: false, skipped: true, error: "Monthly WhatsApp message limit reached" };
 
   console.log("Sending WhatsApp reply", { to, text });
 
@@ -373,12 +382,15 @@ export async function handleWhatsAppWebhook(request: NextRequest, runtime: Webho
         if (!createConversationResult.ok) {
           return failStoredEvent(supabase, workspaceId, eventKey, "create_seller_conversation", createConversationResult.message);
         }
-        await sendWhatsAppMessage(waId, engine.getCurrentStep()!.question, credentials);
+        await sendWhatsAppMessage(waId, engine.getCurrentStep()!.question, credentials, supabase, workspaceId, `${messageId}:seller-start`);
       } else {
         await sendWhatsAppMessage(
           waId,
           `Hello 👋 Welcome to ${workspaceName}. Are you looking to buy, sell, or rent a property?`,
-          credentials
+          credentials,
+          supabase,
+          workspaceId,
+          `${messageId}:welcome`
         );
       }
       continue;
@@ -394,78 +406,46 @@ export async function handleWhatsAppWebhook(request: NextRequest, runtime: Webho
     const input = toConversationInput(message, body);
     const result = engine.processInput(input ?? "");
     if (!result.accepted) {
-      await sendWhatsAppMessage(waId, result.error, credentials);
+      await sendWhatsAppMessage(waId, result.error, credentials, supabase, workspaceId, `${messageId}:validation`);
       continue;
     }
 
-    const stateUpdateResult = await runSupabaseOperation(
-      "update_seller_conversation",
-      eventKey,
-      () => supabase
-        .from("conversation_state")
-        .update({
-          current_step: result.state.currentStep ?? "completed",
-          collected_data: result.state.collectedData,
-          status: result.completed ? "completed" : "active",
-          completed_at: result.completed ? new Date().toISOString() : null
-        })
-        .eq("workspace_id", workspaceId)
-        .eq("id", conversationStateId)
-        .select("id")
-        .single()
-    );
-    if (!stateUpdateResult.ok) {
-      return failStoredEvent(supabase, workspaceId, eventKey, "update_seller_conversation", stateUpdateResult.message);
-    }
-
     if (result.completed) {
-      const sellerLeadResult = await runSupabaseOperation<Record<string, unknown>>(
-        "create_seller_lead",
+      const completionResult = await runSupabaseOperation<Record<string, unknown>>(
+        "complete_seller_conversation",
         eventKey,
-        () => supabase
-          .from("seller_leads")
-          .insert({
-            ...toSellerLeadInsert(result.state.collectedData, {
-              contactId: typeof contactRecord?.id === "string" ? contactRecord.id : null,
-              whatsappContactId,
-              conversationStateId
-            }),
-            workspace_id: workspaceId
-          })
-          .select("id")
-          .single()
+        () => supabase.rpc("complete_seller_conversation", {
+          target_workspace_id: workspaceId,
+          target_conversation_state_id: conversationStateId,
+          target_whatsapp_message_id: messageId,
+          collected_data: result.state.collectedData
+        })
       );
-      if (!sellerLeadResult.ok) {
-        return failStoredEvent(supabase, workspaceId, eventKey, "create_seller_lead", sellerLeadResult.message);
+      if (!completionResult.ok) {
+        return failStoredEvent(supabase, workspaceId, eventKey, "complete_seller_conversation", completionResult.message);
       }
-
-      const sellerLeadId = typeof sellerLeadResult.data?.id === "string" ? sellerLeadResult.data.id : null;
-      const propertyMediaInsert = sellerLeadId
-        ? toPropertyMediaInsert(result.state.collectedData, {
-            sellerLeadId,
-            conversationStateId,
-            whatsappMessageId: messageId
-          })
-        : null;
-      if (!propertyMediaInsert) {
-        return failStoredEvent(supabase, workspaceId, eventKey, "prepare_property_media", "Completed seller media is missing");
-      }
-
-      const propertyMediaResult = await runSupabaseOperation(
-        "create_property_media",
-        eventKey,
-        () => supabase
-          .from("property_media")
-          .insert({ ...propertyMediaInsert, workspace_id: workspaceId })
-          .select("id")
-          .single()
-      );
-      if (!propertyMediaResult.ok) {
-        return failStoredEvent(supabase, workspaceId, eventKey, "create_property_media", propertyMediaResult.message);
-      }
-      await sendWhatsAppMessage(waId, "Thank you. Your property details have been submitted successfully.", credentials);
+      await sendWhatsAppMessage(waId, "Thank you. Your property details have been submitted successfully.", credentials, supabase, workspaceId, `${messageId}:complete`);
     } else {
-      await sendWhatsAppMessage(waId, result.nextStep!.question, credentials);
+      const stateUpdateResult = await runSupabaseOperation(
+        "update_seller_conversation",
+        eventKey,
+        () => supabase
+          .from("conversation_state")
+          .update({
+            current_step: result.state.currentStep,
+            collected_data: result.state.collectedData,
+            status: "active",
+            completed_at: null
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("id", conversationStateId)
+          .select("id")
+          .single()
+      );
+      if (!stateUpdateResult.ok) {
+        return failStoredEvent(supabase, workspaceId, eventKey, "update_seller_conversation", stateUpdateResult.message);
+      }
+      await sendWhatsAppMessage(waId, result.nextStep!.question, credentials, supabase, workspaceId, `${messageId}:${result.state.currentStep}`);
     }
   }
 

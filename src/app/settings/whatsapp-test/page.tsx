@@ -1,10 +1,12 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { requireUser } from "@/lib/auth/require-user";
+import { requireWorkspace } from "@/lib/workspaces/context";
 
 export default async function WhatsAppTestPage() {
   await requireUser();
+  const workspace = await requireWorkspace();
   return (
-    <AppShell title="WhatsApp test" subtitle="Send a single safe test message to one recipient.">
+    <AppShell workspace={workspace} title="WhatsApp test" subtitle="Send a single safe test message to one recipient.">
       <section className="card">
         <h3>Single-recipient test</h3>
         <p className="muted">This interface validates the phone number, confirms the contact is not opted out, and sends a single approved template message.</p>

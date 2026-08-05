@@ -74,7 +74,10 @@ export function verifyWebhookSignature(
   if (!signature) {
     return false;
   }
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+  return expectedBuffer.length === signatureBuffer.length
+    && crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
 export function normalizeWebhookPayload(payload: unknown): NormalizedWebhookPayload | null {

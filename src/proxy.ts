@@ -6,7 +6,11 @@ import { getAuthEnv } from "@/lib/env";
 
 const protectedRoutes = [
   "/dashboard",
+  "/onboarding",
   "/contacts",
+  "/team",
+  "/billing",
+  "/admin",
   "/settings",
   "/campaigns",
   "/inbox",
@@ -48,7 +52,7 @@ export async function proxy(request: NextRequest) {
   const isProtected = protectedRoutes.some((route) => matches(pathname, route));
 
   if (isProtected && !user) return redirectWithCookies("/login", request, response);
-  if (pathname === "/login" && user) return redirectWithCookies("/dashboard", request, response);
+  if ((pathname === "/login" || pathname === "/register") && user) return redirectWithCookies("/dashboard", request, response);
 
   return response;
 }
@@ -56,8 +60,13 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/login",
+    "/register",
     "/dashboard/:path*",
+    "/onboarding/:path*",
     "/contacts/:path*",
+    "/team/:path*",
+    "/billing/:path*",
+    "/admin/:path*",
     "/settings/:path*",
     "/campaigns/:path*",
     "/inbox/:path*",

@@ -1,73 +1,83 @@
-# Abhishree Sellers
+# PropertyFlow
 
-Cloud-only WhatsApp property seller enquiry collector.
+Multi-tenant WhatsApp property-seller acquisition SaaS built with Next.js, Supabase, Meta WhatsApp Cloud API, Stripe, and Vercel. The original Abhishree workspace remains fully supported as the first tenant.
 
-## Stack
+## What is included
 
-- Next.js
-- Vercel
-- Supabase PostgreSQL
-- Supabase Storage
-- Meta WhatsApp Cloud API
+- Email/password registration, login, email confirmation callback, and workspace onboarding
+- Active workspace switcher with tenant-scoped database access and RLS
+- Owner, administrator, and agent roles; expiring email invitations; last-owner protection
+- Per-workspace encrypted WhatsApp credentials and webhook URLs
+- Validated nine-step seller intake: name, email, property type, BHK, area, location, price, documents, and media
+- Atomic and idempotent conversation completion into seller leads and property media
+- Free, Starter, and Pro limits with monthly message/lead usage tracking
+- Stripe Checkout, Customer Portal, and signed/idempotent subscription webhooks
+- Environment-gated super-admin dashboard
 
-## Supabase setup
+## Environment
 
-1. Create a new Supabase project.
-2. Open the SQL editor and run [supabase/migrations/002_contacts_and_auth.sql](supabase/migrations/002_contacts_and_auth.sql) and [supabase/migrations/003_whatsapp_foundation.sql](supabase/migrations/003_whatsapp_foundation.sql).
-3. Create your first admin user from the Supabase Auth UI.
-4. Copy [.env.example](.env.example) to .env.local and fill in the values below.
+Copy `.env.example` to `.env.local`. Never commit real secrets.
 
-### Required environment variables
+Core variables:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-WHATSAPP_VERIFY_TOKEN=
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_BUSINESS_ACCOUNT_ID=
-WHATSAPP_APP_SECRET=
-WHATSAPP_API_VERSION=v23.0
-WHATSAPP_SIGNATURE_BYPASS=false
 NEXT_PUBLIC_SITE_URL=http://localhost:3001
+WHATSAPP_CREDENTIALS_ENCRYPTION_KEY=
 ```
 
-## Meta WhatsApp Cloud API setup
+Keep `WHATSAPP_CREDENTIALS_ENCRYPTION_KEY` permanently. It must be a strong 32-byte value; replacing or losing it makes stored workspace credentials unreadable.
 
-1. Create or select a Meta developer app and add the WhatsApp product.
-2. Connect a WhatsApp Business Account and phone number.
-3. Copy the phone number ID and business account ID from the Meta dashboard.
-4. Generate a webhook verify token locally and set it in the environment.
-5. Set the WhatsApp app secret from Meta.
-6. Configure the webhook URL to your local development host or the Vercel production URL.
-7. Subscribe to webhook fields that include messages and statuses.
-8. Create an approved WhatsApp template and use the single-recipient test page only for safe testing.
+Abhishree’s legacy environment-backed integration additionally uses the `WHATSAPP_*` variables in `.env.example`. New tenants enter credentials in Settings.
 
-## Local development
+Stripe is optional until billing is enabled:
+
+```env
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_STARTER_PRICE_ID=
+STRIPE_PRO_PRICE_ID=
+SUPER_ADMIN_EMAILS=owner@example.com
+```
+
+Without all Stripe values, Checkout is visibly disabled and the rest of the application continues working.
+
+## Database and local development
 
 ```powershell
-cd "D:\AI\Projects\Abhishree Sellers\abhishree-sellers-starter"
 npm install
-copy .env.example .env.local
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
 npm run dev -- -p 3001
 ```
 
-Open http://localhost:3001 and sign in at /login.
+Apply migrations in filename order. Never rerun or edit an already-applied migration; add a new migration for later changes.
 
-## Verification checklist
+## External configuration
 
-- Visit /api/health to verify environment validation.
-- Sign in with your Supabase admin user.
-- Open /dashboard and /contacts to confirm protected routes and persisted contacts data.
-- Use the import endpoint to verify contact persistence in Supabase.
+For each client workspace, save its Meta credentials in Settings and configure the exact workspace webhook URL shown there. Subscribe Meta to `messages` events. Keep Abhishree’s legacy webhook configured until its workspace-specific URL has been live-tested.
 
-## Initial scope
+For Stripe, create recurring Starter and Pro prices, set their IDs, enable the Customer Portal, and register this endpoint:
 
-- Store contacts
-- Create campaigns
-- Send approved WhatsApp templates
-- Receive webhook replies
-- Categorise sale/rent/later/not interested
-- Save text and media enquiries
-- Respect STOP / do-not-contact
+```text
+https://YOUR_DOMAIN/api/billing/webhook
+```
+
+Subscribe it to `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted`, then store the endpoint signing secret as `STRIPE_WEBHOOK_SECRET`.
+
+## Release verification
+
+```powershell
+npm test
+npx tsc --noEmit
+npm run lint
+npm run build
+git diff --check
+```
+
+After deploying, verify `/api/health`, registration/login, workspace creation and switching, invitations, per-workspace WhatsApp settings, both webhook verification URLs, one complete seller flow, tenant data isolation, Stripe test Checkout/Portal/webhooks, and super-admin access/non-access.
+
+The second-tenant live WhatsApp and Stripe tests require real external test credentials. Do not reuse Abhishree’s phone number or secrets for that validation.

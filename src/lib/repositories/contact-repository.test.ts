@@ -11,6 +11,7 @@ describe("contact repository helpers", () => {
   it("preserves do not contact when merging duplicate contacts", () => {
     const existing = {
       id: "1",
+      workspace_id: "workspace-1",
       name: "Asha",
       phone: "9876543210",
       normalized_phone: "9876543210",

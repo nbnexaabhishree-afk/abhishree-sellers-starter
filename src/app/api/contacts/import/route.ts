@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { contactInputSchema, createSupabaseServiceRoleClient, normalizePhone } from "@/lib/repositories/contact-repository";
+import { requireApiWorkspace } from "@/lib/workspaces/context";
 
 const bodySchema = z.object({
   rows: z.array(contactInputSchema),
@@ -14,6 +15,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const workspace = await requireApiWorkspace();
+  if (!workspace.ok) return workspace.response;
+  const { workspaceId } = workspace.context;
+
   try {
     const client = createSupabaseServiceRoleClient();
     const summary = { totalRows: body.data.rows.length, imported: 0, skipped: 0, merged: 0, replaced: 0, invalid: 0, duplicates: 0, errors: 0 };
@@ -23,6 +28,7 @@ export async function POST(request: Request) {
       const { data: existing, error: lookupError } = await client
         .from("contacts")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .eq("normalized_phone", normalized)
         .maybeSingle();
 
@@ -53,7 +59,11 @@ export async function POST(request: Request) {
           last_contacted_at: row.last_contacted_at ?? existing.last_contacted_at
         };
 
-        const { error } = await client.from("contacts").update(next).eq("id", existing.id);
+        const { error } = await client
+          .from("contacts")
+          .update(next)
+          .eq("workspace_id", workspaceId)
+          .eq("id", existing.id);
         if (error) {
           summary.errors += 1;
           continue;
@@ -67,6 +77,7 @@ export async function POST(request: Request) {
       }
 
       const { error } = await client.from("contacts").insert({
+        workspace_id: workspaceId,
         name: row.name ?? null,
         phone: row.phone,
         normalized_phone: normalized,

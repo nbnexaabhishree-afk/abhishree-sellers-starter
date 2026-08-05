@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createSupabaseServiceRoleClient } from "@/lib/repositories/contact-repository";
+import { requireApiWorkspace } from "@/lib/workspaces/context";
 
 const patchSchema = z.object({
   name: z.string().trim().max(200).nullable().optional(),
@@ -22,6 +23,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const workspace = await requireApiWorkspace();
+  if (!workspace.ok) return workspace.response;
+
   try {
     const client = createSupabaseServiceRoleClient();
     const payload = { ...parsed.data };
@@ -29,7 +33,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       Object.assign(payload, { normalized_phone: payload.phone.replace(/\D/g, "") });
     }
 
-    const { data, error } = await client.from("contacts").update(payload).eq("id", id).select().single();
+    const { data, error } = await client
+      .from("contacts")
+      .update(payload)
+      .eq("workspace_id", workspace.context.workspaceId)
+      .eq("id", id)
+      .select()
+      .single();
     if (error) {
       return NextResponse.json({ error: "Unable to update contact" }, { status: 500 });
     }
@@ -43,9 +53,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const workspace = await requireApiWorkspace();
+  if (!workspace.ok) return workspace.response;
   try {
     const client = createSupabaseServiceRoleClient();
-    const { error } = await client.from("contacts").delete().eq("id", id);
+    const { error } = await client
+      .from("contacts")
+      .delete()
+      .eq("workspace_id", workspace.context.workspaceId)
+      .eq("id", id);
     if (error) {
       return NextResponse.json({ error: "Unable to delete contact" }, { status: 500 });
     }

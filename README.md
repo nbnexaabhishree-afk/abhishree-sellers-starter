@@ -80,4 +80,16 @@ git diff --check
 
 After deploying, verify `/api/health`, registration/login, workspace creation and switching, invitations, per-workspace WhatsApp settings, both webhook verification URLs, one complete seller flow, tenant data isolation, Stripe test Checkout/Portal/webhooks, and super-admin access/non-access.
 
+The disposable production tenancy check creates isolated test users/workspaces, validates RLS, invitations, roles, limits, owner protection, and the Supabase callback allowlist, then removes only those generated records:
+
+```powershell
+npm run verify:production-tenancy
+```
+
+Validate that the legacy Abhishree Meta token can still access its configured phone number without printing credentials:
+
+```powershell
+npm run verify:meta
+```
+
 The second-tenant live WhatsApp and Stripe tests require real external test credentials. Do not reuse Abhishree’s phone number or secrets for that validation.

@@ -5,9 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "npm test && npm run typecheck && npm run lint && npm run build",
+    "verify:production-tenancy": "node --env-file=.env.local scripts/verify-production-tenancy.mjs",
+    "verify:meta": "node --env-file=.env.local scripts/verify-meta-integration.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "latest",

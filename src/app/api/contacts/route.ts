@@ -17,13 +17,19 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json());
+  const workspace = await requireApiWorkspace();
+  if (!workspace.ok) return workspace.response;
+
+  let input: unknown;
+  try {
+    input = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(input);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
-
-  const workspace = await requireApiWorkspace();
-  if (!workspace.ok) return workspace.response;
   const { workspaceId } = workspace.context;
 
   try {

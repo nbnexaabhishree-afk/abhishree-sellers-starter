@@ -1,10 +1,16 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth/require-user";
+import { requireWorkspace } from "@/lib/workspaces/context";
 
 export default async function DashboardPage() {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase.from("contacts").select("*").limit(5);
+  const workspace = await requireWorkspace();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("workspace_id", workspace.workspaceId)
+    .limit(5);
 
   return (
     <AppShell title="Dashboard" subtitle="Protected admin area for your contact operations.">

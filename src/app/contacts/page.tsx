@@ -3,10 +3,16 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth/require-user";
+import { requireWorkspace } from "@/lib/workspaces/context";
 
 export default async function ContactsPage() {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase.from("contacts").select("*").order("created_at", { ascending: false });
+  const workspace = await requireWorkspace();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("workspace_id", workspace.workspaceId)
+    .order("created_at", { ascending: false });
 
   return (
     <AppShell title="Contacts" subtitle="Use the contacts workspace to manage property-owner records.">

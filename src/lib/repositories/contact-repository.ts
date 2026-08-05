@@ -7,6 +7,7 @@ export type ContactStatus = "new" | "follow_up" | "qualified" | "won" | "lost" |
 
 export type ContactRecord = {
   id: string;
+  workspace_id: string;
   name: string | null;
   phone: string;
   normalized_phone: string;
@@ -153,10 +154,17 @@ export const createSupabaseServiceRoleClient = () => {
 };
 
 export class SupabaseContactRepository implements ContactRepository {
-  constructor(private readonly client: ReturnType<typeof createSupabaseClient>) {}
+  constructor(
+    private readonly client: ReturnType<typeof createSupabaseClient>,
+    private readonly workspaceId: string
+  ) {}
 
   async listContacts(options: { search?: string; status?: ContactStatus | "all"; limit?: number; offset?: number } = {}) {
-    let query = this.client.from("contacts").select("*").order("created_at", { ascending: false });
+    let query = this.client
+      .from("contacts")
+      .select("*")
+      .eq("workspace_id", this.workspaceId)
+      .order("created_at", { ascending: false });
 
     if (options.status && options.status !== "all") {
       query = query.eq("status", options.status);
@@ -189,7 +197,12 @@ export class SupabaseContactRepository implements ContactRepository {
 
   async getByNormalizedPhone(phone: string) {
     const normalized = normalizePhone(phone);
-    const { data, error } = await this.client.from("contacts").select("*").eq("normalized_phone", normalized).maybeSingle();
+    const { data, error } = await this.client
+      .from("contacts")
+      .select("*")
+      .eq("workspace_id", this.workspaceId)
+      .eq("normalized_phone", normalized)
+      .maybeSingle();
     if (error) {
       throw new Error("Unable to resolve contact");
     }
@@ -200,6 +213,7 @@ export class SupabaseContactRepository implements ContactRepository {
     const normalized = normalizePhone(input.phone);
     const payload = {
       ...input,
+      workspace_id: this.workspaceId,
       normalized_phone: normalized,
       status: input.status ?? "new",
       do_not_contact: input.do_not_contact ?? false
@@ -220,7 +234,13 @@ export class SupabaseContactRepository implements ContactRepository {
       (payload as Record<string, string>).normalized_phone = normalizePhone(payload.phone);
     }
 
-    const { data, error } = await this.client.from("contacts").update(payload).eq("id", id).select().single();
+    const { data, error } = await this.client
+      .from("contacts")
+      .update(payload)
+      .eq("workspace_id", this.workspaceId)
+      .eq("id", id)
+      .select()
+      .single();
     if (error) {
       throw new Error("Unable to update contact");
     }
@@ -229,7 +249,11 @@ export class SupabaseContactRepository implements ContactRepository {
   }
 
   async deleteContact(id: string) {
-    const { error } = await this.client.from("contacts").delete().eq("id", id);
+    const { error } = await this.client
+      .from("contacts")
+      .delete()
+      .eq("workspace_id", this.workspaceId)
+      .eq("id", id);
     if (error) {
       throw new Error("Unable to delete contact");
     }
@@ -263,7 +287,11 @@ export class SupabaseContactRepository implements ContactRepository {
           summary.merged += 1;
         }
 
-        const { error } = await this.client.from("contacts").update(merged).eq("id", existing.id);
+        const { error } = await this.client
+          .from("contacts")
+          .update(merged)
+          .eq("workspace_id", this.workspaceId)
+          .eq("id", existing.id);
         if (error) {
           summary.errors += 1;
           continue;
@@ -271,7 +299,13 @@ export class SupabaseContactRepository implements ContactRepository {
         continue;
       }
 
-      const { error } = await this.client.from("contacts").insert({ ...parsed.data, normalized_phone: normalized, status: parsed.data.status ?? "new", do_not_contact: parsed.data.do_not_contact ?? false });
+      const { error } = await this.client.from("contacts").insert({
+        ...parsed.data,
+        workspace_id: this.workspaceId,
+        normalized_phone: normalized,
+        status: parsed.data.status ?? "new",
+        do_not_contact: parsed.data.do_not_contact ?? false
+      });
       if (error) {
         summary.errors += 1;
       } else {

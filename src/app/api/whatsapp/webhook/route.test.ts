@@ -2,10 +2,18 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { GET, POST } from "./route";
+import { GET, handleWhatsAppWebhook, POST } from "./route";
 
 vi.mock("@/lib/env", () => ({
-  getWhatsAppEnvValidation: () => ({ ok: true, missing: [] })
+  getWhatsAppEnvValidation: () => ({ ok: true, missing: [] }),
+  getWhatsAppEnv: () => ({
+    WHATSAPP_VERIFY_TOKEN: "sample-token",
+    WHATSAPP_ACCESS_TOKEN: "access-token",
+    WHATSAPP_PHONE_NUMBER_ID: "phone-id",
+    WHATSAPP_BUSINESS_ACCOUNT_ID: "business-id",
+    WHATSAPP_APP_SECRET: "app-secret",
+    WHATSAPP_API_VERSION: "v25.0"
+  })
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -49,6 +57,9 @@ const realEnvelope = {
 
 function defaultResult(table: string, operation: string): FakeResult {
   if (table === "contacts" && operation === "select") {
+    return { data: null, error: null, status: 200 };
+  }
+  if (table === "conversation_state" && operation === "select") {
     return { data: null, error: null, status: 200 };
   }
   if (table === "whatsapp_webhook_events" && operation === "insert") {
@@ -172,7 +183,36 @@ describe("WhatsApp webhook persistence", () => {
 
     expect(response.status).toBe(200);
     expect(database.calls.find((call) => call.table === "messages" && call.operation === "upsert")?.payload)
-      .toMatchObject({ whatsapp_message_id: "wamid.sample-message", direction: "inbound" });
+      .toMatchObject({
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+        whatsapp_message_id: "wamid.sample-message",
+        direction: "inbound"
+      });
+  });
+
+  it("scopes resolved tenant webhook data to that workspace", async () => {
+    const database = createFakeDatabase();
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(database.client as never);
+
+    const response = await handleWhatsAppWebhook(webhookRequest(realEnvelope), {
+      workspaceId: "workspace-2",
+      workspaceName: "Workspace Two",
+      credentials: {
+        verifyToken: "tenant-verify-token",
+        accessToken: "tenant-access-token",
+        phoneNumberId: "tenant-phone-id",
+        appSecret: "tenant-app-secret",
+        apiVersion: "v25.0"
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(database.calls.find((call) =>
+      call.table === "whatsapp_webhook_events" && call.operation === "insert"
+    )?.payload).toMatchObject({ workspace_id: "workspace-2" });
+    expect(database.calls.find((call) =>
+      call.table === "messages" && call.operation === "upsert"
+    )?.payload).toMatchObject({ workspace_id: "workspace-2" });
   });
 
   it("returns 500 when the raw event insert fails", async () => {
@@ -242,5 +282,128 @@ describe("WhatsApp webhook persistence", () => {
       && call.operation === "update"
       && call.payload?.processing_status === "processed"
     )).toBeDefined();
+  });
+
+  it("starts the seller flow and persists migration-005-compatible state", async () => {
+    const database = createFakeDatabase();
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(database.client as never);
+    const payload = structuredClone(realEnvelope);
+    payload.entry[0].changes[0].value.messages[0].text.body = "I want to sell";
+
+    const response = await POST(webhookRequest(payload));
+
+    expect(response.status).toBe(200);
+    expect(database.calls.find((call) =>
+      call.table === "conversation_state" && call.operation === "insert"
+    )?.payload).toMatchObject({
+      workspace_id: "00000000-0000-4000-8000-000000000001",
+      flow_type: "seller",
+      current_step: "seller_name",
+      collected_data: {},
+      status: "active"
+    });
+  });
+
+  it("advances an existing seller conversation without shared process state", async () => {
+    const database = createFakeDatabase({
+      "conversation_state.select": [{
+        data: {
+          id: "conversation-1",
+          current_step: "seller_name",
+          collected_data: {},
+          status: "active"
+        },
+        error: null,
+        status: 200
+      }]
+    });
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(database.client as never);
+    const payload = structuredClone(realEnvelope);
+    payload.entry[0].changes[0].value.messages[0].text.body = "Anita Shah";
+
+    const response = await POST(webhookRequest(payload));
+
+    expect(response.status).toBe(200);
+    expect(database.calls.find((call) =>
+      call.table === "conversation_state" && call.operation === "update"
+    )?.payload).toMatchObject({
+      current_step: "seller_email",
+      collected_data: { seller_name: "Anita Shah" },
+      status: "active"
+    });
+  });
+
+  it("completes a seller conversation from a WhatsApp media message", async () => {
+    const collectedData = {
+      seller_name: "Anita Shah",
+      seller_email: "anita@example.com",
+      property_type: "Apartment",
+      bhk: "3 BHK",
+      area_sqft: 1450,
+      location: "Ahmedabad",
+      expected_price: 12500000,
+      documents_available: true
+    };
+    const database = createFakeDatabase({
+      "conversation_state.select": [{
+        data: {
+          id: "conversation-1",
+          current_step: "property_media",
+          collected_data: collectedData,
+          status: "active"
+        },
+        error: null,
+        status: 200
+      }]
+    });
+    vi.mocked(createSupabaseAdminClient).mockReturnValue(database.client as never);
+    const mediaEnvelope = {
+      object: "whatsapp_business_account",
+      entry: [{
+        id: "business-id",
+        changes: [{
+          field: "messages",
+          value: {
+            ...messageValue,
+            messages: [{
+              from: "15551234567",
+              id: "wamid.media-message",
+              timestamp: "1700000001",
+              image: { id: "media-1", mime_type: "image/jpeg", caption: "Front view" },
+              type: "image"
+            }]
+          }
+        }]
+      }]
+    };
+
+    const response = await POST(webhookRequest(mediaEnvelope));
+
+    expect(response.status).toBe(200);
+    expect(database.calls.find((call) =>
+      call.table === "conversation_state" && call.operation === "update"
+    )?.payload).toMatchObject({ current_step: "completed", status: "completed" });
+    expect(database.calls.find((call) =>
+      call.table === "seller_leads" && call.operation === "insert"
+    )?.payload).toMatchObject({
+      seller_name: "Anita Shah",
+      seller_email: "anita@example.com",
+      documents_available: true,
+      raw_collected_data: {
+        property_media: { mediaId: "media-1", mediaType: "image" }
+      }
+    });
+    expect(database.calls.find((call) =>
+      call.table === "property_media" && call.operation === "insert"
+    )?.payload).toMatchObject({
+      workspace_id: "00000000-0000-4000-8000-000000000001",
+      enquiry_id: null,
+      seller_lead_id: "seller_leads-1",
+      conversation_state_id: "conversation-1",
+      whatsapp_message_id: "wamid.media-message",
+      media_id: "media-1",
+      media_type: "image",
+      storage_path: null
+    });
   });
 });

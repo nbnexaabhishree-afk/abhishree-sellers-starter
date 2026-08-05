@@ -54,6 +54,10 @@ export function getWhatsAppEnv(env: Record<string, string | undefined> = process
   return whatsappEnvSchema.parse(env);
 }
 
+export function getIntegrationEncryptionKey(env: Record<string, string | undefined> = process.env) {
+  return requiredString.parse(env.WHATSAPP_CREDENTIALS_ENCRYPTION_KEY);
+}
+
 export function getClientEnv(env: Record<string, string | undefined> = process.env) {
   return getAuthEnv(env);
 }

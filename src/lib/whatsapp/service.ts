@@ -26,6 +26,29 @@ export type SendTemplateMessageResult = {
   error?: string;
 };
 
+export type WhatsAppCredentials = {
+  verifyToken: string;
+  accessToken: string;
+  phoneNumberId: string;
+  businessAccountId?: string;
+  appSecret: string;
+  apiVersion: string;
+};
+
+export function environmentWhatsAppCredentials(): WhatsAppCredentials | null {
+  const validation = getWhatsAppEnvValidation();
+  if (!validation.ok) return null;
+  const env = getWhatsAppEnv();
+  return {
+    verifyToken: env.WHATSAPP_VERIFY_TOKEN,
+    accessToken: env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+    businessAccountId: env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+    appSecret: env.WHATSAPP_APP_SECRET,
+    apiVersion: env.WHATSAPP_API_VERSION
+  };
+}
+
 type WebhookValue = Record<string, unknown>;
 
 export type NormalizedWebhookPayload = {
@@ -40,14 +63,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function verifyWebhookSignature(rawBody: string, signature: string | null | undefined) {
-  const validation = getWhatsAppEnvValidation();
-  if (!validation.ok) {
-    return false;
-  }
-
-  const env = getWhatsAppEnv();
-  const expected = `sha256=${crypto.createHmac("sha256", env.WHATSAPP_APP_SECRET).update(rawBody).digest("hex")}`;
+export function verifyWebhookSignature(
+  rawBody: string,
+  signature: string | null | undefined,
+  appSecret?: string
+) {
+  const secret = appSecret ?? environmentWhatsAppCredentials()?.appSecret;
+  if (!secret) return false;
+  const expected = `sha256=${crypto.createHmac("sha256", secret).update(rawBody).digest("hex")}`;
   if (!signature) {
     return false;
   }
@@ -113,13 +136,13 @@ export function extractWebhookMessages(payload: NormalizedWebhookPayload) {
   }));
 }
 
-export async function sendTemplateMessage(request: TemplateMessageRequest): Promise<SendTemplateMessageResult> {
-  const validation = getWhatsAppEnvValidation();
-  if (!validation.ok) {
+export async function sendTemplateMessage(
+  request: TemplateMessageRequest,
+  credentials = environmentWhatsAppCredentials()
+): Promise<SendTemplateMessageResult> {
+  if (!credentials) {
     return { ok: false, status: 500, error: "WhatsApp credentials are not configured" };
   }
-
-  const env = getWhatsAppEnv();
   try {
     console.log("WhatsApp test send starting");
     console.log("WhatsApp test send env", {
@@ -127,10 +150,10 @@ export async function sendTemplateMessage(request: TemplateMessageRequest): Prom
       phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID
     });
 
-    const response = await fetch(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    const response = await fetch(`https://graph.facebook.com/${credentials.apiVersion}/${credentials.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${credentials.accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -159,7 +182,7 @@ export async function sendTemplateMessage(request: TemplateMessageRequest): Prom
       console.error("WhatsApp Meta API error", {
         status: response.status,
         body: responseBody,
-        phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
+        phoneNumberId: credentials.phoneNumberId
       });
       return {
         ok: false,

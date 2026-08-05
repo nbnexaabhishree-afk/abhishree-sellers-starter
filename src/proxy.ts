@@ -6,6 +6,7 @@ import { getAuthEnv } from "@/lib/env";
 
 const protectedRoutes = [
   "/dashboard",
+  "/onboarding",
   "/contacts",
   "/settings",
   "/campaigns",
@@ -57,6 +58,7 @@ export const config = {
   matcher: [
     "/login",
     "/dashboard/:path*",
+    "/onboarding/:path*",
     "/contacts/:path*",
     "/settings/:path*",
     "/campaigns/:path*",

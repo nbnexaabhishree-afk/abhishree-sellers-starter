@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createSupabaseServiceRoleClient } from "@/lib/repositories/contact-repository";
+import { requireApiWorkspace } from "@/lib/workspaces/context";
 
 const bodySchema = z.object({
   name: z.string().trim().max(200).nullable().optional(),
@@ -21,10 +22,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const workspace = await requireApiWorkspace();
+  if (!workspace.ok) return workspace.response;
+  const { workspaceId } = workspace.context;
+
   try {
     const client = createSupabaseServiceRoleClient();
     const normalizedPhone = parsed.data.phone.replace(/\D/g, "");
-    const { data: existing } = await client.from("contacts").select("*").eq("normalized_phone", normalizedPhone).maybeSingle();
+    const { data: existing } = await client
+      .from("contacts")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("normalized_phone", normalizedPhone)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json({ error: "Duplicate contact" }, { status: 409 });
@@ -32,6 +42,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await client.from("contacts").insert({
       ...parsed.data,
+      workspace_id: workspaceId,
       normalized_phone: normalizedPhone,
       status: parsed.data.status ?? "new",
       do_not_contact: parsed.data.do_not_contact ?? false

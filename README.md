@@ -1,6 +1,6 @@
 # PropertyFlow
 
-Multi-tenant WhatsApp property-seller acquisition SaaS built with Next.js, Supabase, Meta WhatsApp Cloud API, Stripe, and Vercel. The original Abhishree workspace remains fully supported as the first tenant.
+Multi-tenant WhatsApp property-seller acquisition SaaS built with Next.js, Supabase, Meta WhatsApp Cloud API, Razorpay, and Vercel. The original Abhishree workspace remains fully supported as the first tenant.
 
 ## What is included
 
@@ -11,7 +11,7 @@ Multi-tenant WhatsApp property-seller acquisition SaaS built with Next.js, Supab
 - Validated nine-step seller intake: name, email, property type, BHK, area, location, price, documents, and media
 - Atomic and idempotent conversation completion into seller leads and property media
 - Free, Starter, and Pro limits with monthly message/lead usage tracking
-- Stripe Checkout, Customer Portal, and signed/idempotent subscription webhooks
+- Razorpay Subscriptions Checkout, signed payment verification, cycle-end cancellation, and idempotent webhooks
 - Environment-gated super-admin dashboard
 
 ## Environment
@@ -32,17 +32,18 @@ Keep `WHATSAPP_CREDENTIALS_ENCRYPTION_KEY` permanently. It must be a strong 32-b
 
 Abhishree’s legacy environment-backed integration additionally uses the `WHATSAPP_*` variables in `.env.example`. New tenants enter credentials in Settings.
 
-Stripe is optional until billing is enabled:
+Razorpay is optional until billing is enabled:
 
 ```env
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_STARTER_PRICE_ID=
-STRIPE_PRO_PRICE_ID=
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+RAZORPAY_STARTER_PLAN_ID=
+RAZORPAY_PRO_PLAN_ID=
 SUPER_ADMIN_EMAILS=owner@example.com
 ```
 
-Without all Stripe values, Checkout is visibly disabled and the rest of the application continues working.
+Without all Razorpay values, Checkout is visibly disabled and the rest of the application continues working.
 
 ## Database and local development
 
@@ -60,13 +61,13 @@ Apply migrations in filename order. Never rerun or edit an already-applied migra
 
 For each client workspace, save its Meta credentials in Settings and configure the exact workspace webhook URL shown there. Subscribe Meta to `messages` events. Keep Abhishree’s legacy webhook configured until its workspace-specific URL has been live-tested.
 
-For Stripe, create recurring Starter and Pro prices, set their IDs, enable the Customer Portal, and register this endpoint:
+For Razorpay, enable Subscriptions, create monthly Starter and Pro plans, set their plan IDs, and register this endpoint:
 
 ```text
 https://YOUR_DOMAIN/api/billing/webhook
 ```
 
-Subscribe it to `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted`, then store the endpoint signing secret as `STRIPE_WEBHOOK_SECRET`.
+Subscribe it to `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.completed`, `subscription.updated`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.paused`, and `subscription.resumed`. Configure a separate webhook secret and store it as `RAZORPAY_WEBHOOK_SECRET`.
 
 ## Release verification
 
@@ -78,7 +79,7 @@ npm run build
 git diff --check
 ```
 
-After deploying, verify `/api/health`, registration/login, workspace creation and switching, invitations, per-workspace WhatsApp settings, both webhook verification URLs, one complete seller flow, tenant data isolation, Stripe test Checkout/Portal/webhooks, and super-admin access/non-access.
+After deploying, verify `/api/health`, registration/login, workspace creation and switching, invitations, per-workspace WhatsApp settings, both webhook verification URLs, one complete seller flow, tenant data isolation, Razorpay test Checkout/payment verification/cancellation/webhooks, and super-admin access/non-access.
 
 The disposable production tenancy check creates isolated test users/workspaces, validates RLS, invitations, roles, limits, owner protection, and the Supabase callback allowlist, then removes only those generated records:
 
@@ -92,4 +93,4 @@ Validate that the legacy Abhishree Meta token can still access its configured ph
 npm run verify:meta
 ```
 
-The second-tenant live WhatsApp and Stripe tests require real external test credentials. Do not reuse Abhishree’s phone number or secrets for that validation.
+The second-tenant live WhatsApp and Razorpay tests require real external test credentials. Do not reuse Abhishree’s phone number or secrets for that validation.

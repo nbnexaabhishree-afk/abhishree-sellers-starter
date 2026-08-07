@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCoreEnvValidation, getStripeEnvValidation, getWhatsAppEnvValidation } from "@/lib/env";
+import { getCoreEnvValidation, getRazorpayEnvValidation, getWhatsAppEnvValidation } from "@/lib/env";
 
 export async function GET() {
   return NextResponse.json({
@@ -10,7 +10,7 @@ export async function GET() {
     environment: {
       core: getCoreEnvValidation(),
       whatsapp: getWhatsAppEnvValidation(),
-      stripe: getStripeEnvValidation()
+      razorpay: getRazorpayEnvValidation()
     }
   });
 }

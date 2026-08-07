@@ -4,7 +4,7 @@ const features = [
   ["Nine-field seller intake", "Validate property details and media through a guided WhatsApp conversation."],
   ["Isolated client workspaces", "Keep every client’s contacts, messages, leads, media, credentials, and team separate."],
   ["Secure integrations", "Store WhatsApp credentials encrypted and use a dedicated webhook URL per workspace."],
-  ["Team and billing controls", "Invite agents, enforce roles and limits, and manage subscriptions through Stripe."]
+  ["Team and billing controls", "Invite agents, enforce roles and limits, and manage subscriptions through Razorpay."]
 ];
 
 export default function HomePage() {

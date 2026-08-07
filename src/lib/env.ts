@@ -42,11 +42,12 @@ const whatsappEnvSchema = z.object({
   WHATSAPP_API_VERSION: optionalStringWithDefault("v23.0")
 });
 
-const stripeEnvSchema = z.object({
-  STRIPE_SECRET_KEY: requiredString,
-  STRIPE_WEBHOOK_SECRET: requiredString,
-  STRIPE_STARTER_PRICE_ID: requiredString,
-  STRIPE_PRO_PRICE_ID: requiredString
+const razorpayEnvSchema = z.object({
+  RAZORPAY_KEY_ID: requiredString,
+  RAZORPAY_KEY_SECRET: requiredString,
+  RAZORPAY_WEBHOOK_SECRET: requiredString,
+  RAZORPAY_STARTER_PLAN_ID: requiredString,
+  RAZORPAY_PRO_PLAN_ID: requiredString
 });
 
 export function getCoreEnv(env: Record<string, string | undefined> = process.env) {
@@ -65,12 +66,12 @@ export function getIntegrationEncryptionKey(env: Record<string, string | undefin
   return requiredString.parse(env.WHATSAPP_CREDENTIALS_ENCRYPTION_KEY);
 }
 
-export function getStripeEnv(env: Record<string, string | undefined> = process.env) {
-  return stripeEnvSchema.parse(env);
+export function getRazorpayEnv(env: Record<string, string | undefined> = process.env) {
+  return razorpayEnvSchema.parse(env);
 }
 
-export function getStripeEnvValidation(env: Record<string, string | undefined> = process.env) {
-  const required = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_STARTER_PRICE_ID", "STRIPE_PRO_PRICE_ID"] as const;
+export function getRazorpayEnvValidation(env: Record<string, string | undefined> = process.env) {
+  const required = ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET", "RAZORPAY_STARTER_PLAN_ID", "RAZORPAY_PRO_PLAN_ID"] as const;
   const missing = required.filter((name) => !env[name]?.trim());
   return { ok: missing.length === 0, missing };
 }
